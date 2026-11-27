@@ -1,0 +1,73 @@
+{% extends "base.html" %}{% block title %}Renewals{% endblock %}
+{% block content %}
+<div class="topbar"><h1>Renewals due</h1></div>
+<form class="toolbar" method="get">
+  <div><label for="d">Policies ending within</label>
+    <select id="d" name="days">{% for d in (15,30,60,90,180) %}<option value="{{ d }}" {{ 'selected' if d==days }}>{{ d }} days</option>{% endfor %}</select></div>
+  <div><label for="tid">Draft</label>
+    <select id="tid" name="template_id">{% for t in templates %}<option value="{{ t.id }}" {{ 'selected' if tpl and t.id==tpl.id }}>{{ t.title }}</option>{% endfor %}</select></div>
+  <button class="btn" type="submit">Show list</button>
+</form>
+
+<form method="post" action="{{ url_for('renewals', days=days, template_id=tpl.id if tpl else '') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="panel"><h2>Draft message</h2><p class="muted" style="margin:.2rem 0 0">Renewal reminders go by <b>WhatsApp and email</b>, directly to the client, from the company number and company email ID of the employee who handles that client (column <b>Sends from</b>).</p>
+    <div class="grid">
+      <div class="full"><label for="subject">Email subject</label><input id="subject" type="text" name="subject" value="{{ tpl.subject if tpl else '' }}" {{ '' if current_user.can('send') else 'readonly' }}></div>
+      <div class="full"><label for="body">Message — edit it here before sending; {policy_type}, {policy_number}, {insurer}, {expiry_date} and {name} are filled for each policy</label>
+      <textarea id="body" name="body" rows="6" {{ '' if current_user.can('send') else 'readonly' }}>{{ tpl.body if tpl else '' }}</textarea></div>
+    </div>
+  </div>
+
+  <div class="panel scroll"><h2>Policies <span class="muted" style="font-size:.9rem">({{ rows|length }})</span></h2>
+  {% if rows %}
+  <table class="t"><thead><tr>{% if current_user.can('send') %}<th><input type="checkbox" id="all" aria-label="Select all" style="width:auto"></th>{% endif %}
+    <th>Ends on</th><th>Client</th><th>Policy</th><th>Insurer</th><th>Policy no.</th><th>Email</th><th>Sends from</th>{% if current_user.can('send') %}<th>WhatsApp</th>{% endif %}{% if current_user.can('send') %}<th>Email draft</th>{% endif %}</tr></thead><tbody>
+  {% for r in rows %}
+  <tr>{% if current_user.can('send') %}<td><input type="checkbox" name="sel" value="{{ r.key }}" class="pick" style="width:auto" aria-label="Select {{ r.client.name }}"></td>{% endif %}
+    <td>{{ r.expiry|fdate }}<br>{% if r.days < 0 %}<span class="pill bad">{{ -r.days }} days ago</span>{% elif r.days <= 7 %}<span class="pill warn">{{ r.days }} days left</span>{% else %}<span class="muted">{{ r.days }} days left</span>{% endif %}</td>
+    <td><a href="{{ url_for('client_detail', cid=r.client.id) }}">{{ r.client.name }}</a><br><span class="muted">{{ r.client.mobile or '' }}</span></td>
+    <td>{{ pol_title(r.kind, r.p) }}</td><td>{{ r.p.insurer or '' }}</td><td>{{ r.p.policy_number or '' }}</td><td>{{ r.client.email or '' }}</td><td>{{ r.sender.full_name or r.sender.username }}<br><span class="muted">{{ r.sender.mobile or "no number set" }}{% if r.sender.email %}<br>{{ r.sender.email }}{% endif %}</span></td>
+    {% if current_user.can('send') %}<td>{% if wa_api_ok %}<span class="muted">Sent automatically{% if not r.wa %} (no mobile){% endif %}</span>{% elif r.wa and r.sender.id == current_user.id %}{% if r.done %}<span class="pill ok">Opened today &#10003;</span> {% endif %}<button type="button" class="btn wa sm wa-btn" data-key="{{ r.key }}" data-cid="{{ r.client.id }}" data-num="{{ r.wa }}" data-ctx='{{ r.ctx|tojson }}'>Open WhatsApp</button>{% elif r.wa %}<span class="muted">Only {{ r.sender.full_name or r.sender.username }} can send from their number</span>{% else %}<span class="muted">No mobile</span>{% endif %}</td>{% endif %}
+    {% if current_user.can('send') %}<td>{% if r.client.email and r.sender.id == current_user.id %}{% if r.email_done %}<span class="pill ok">Opened today &#10003;</span> {% endif %}<span class="actions"><button type="button" class="btn sm em-btn" data-mode="gmail" data-key="{{ r.key }}" data-cid="{{ r.client.id }}" data-email="{{ r.client.email }}" data-from="{{ r.sender.email or '' }}" data-ctx='{{ r.ctx|tojson }}'>Gmail</button><button type="button" class="btn alt sm em-btn" data-mode="mailto" data-key="{{ r.key }}" data-cid="{{ r.client.id }}" data-email="{{ r.client.email }}" data-from="{{ r.sender.email or '' }}" data-ctx='{{ r.ctx|tojson }}'>Mail app</button></span>{% elif r.client.email %}<span class="muted">Only {{ r.sender.full_name or r.sender.username }} sends from their mail</span>{% else %}<span class="muted">No email</span>{% endif %}</td>{% endif %}</tr>
+  {% endfor %}</tbody></table>
+  {% else %}<p class="muted">No policies end in this window.</p>{% endif %}
+  </div>
+
+  {% if current_user.can('send') and rows %}
+  <div class="panel"><h2>Send to the selected policies</h2>
+    <div class="perm"><input type="checkbox" name="channels" value="email" id="ch1" {{ 'checked' if email_ok else 'disabled' }}><label for="ch1" style="font-weight:400">Email {% if not email_ok %}<span class="muted">(add SMTP settings to enable)</span>{% endif %}</label></div>
+    <div class="perm"><input type="checkbox" name="channels" value="whatsapp_api" id="ch2" {{ 'checked' if wa_api_ok else 'disabled' }}><label for="ch2" style="font-weight:400">WhatsApp Business API {% if not wa_api_ok %}<span class="muted">(not set up; use the per-row Open WhatsApp button)</span>{% endif %}</label></div>
+    <button class="btn" type="submit" onclick="return confirm('Send the message to all selected policies?')">Send now</button>
+  </div>
+  {% endif %}
+</form>
+{% endblock %}
+{% block scripts %}<script>
+(function(){
+  var all=document.getElementById('all');
+  if(all){all.addEventListener('change',function(){document.querySelectorAll('.pick').forEach(function(c){c.checked=all.checked;});});}
+  function fill(t,ctx){return t.replace(/\{(\w+)\}/g,function(m,k){return ctx[k]!==undefined?ctx[k]:m;});}
+  document.querySelectorAll('.wa-btn').forEach(function(b){
+    b.addEventListener('click',function(){
+      var text=fill(document.getElementById('body').value, JSON.parse(b.dataset.ctx));
+      window.open('https://wa.me/'+b.dataset.num+'?text='+encodeURIComponent(text),'_blank');
+      fetch('{{ url_for("log_open") }}',{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':document.querySelector('meta[name=csrf-token]').content},body:JSON.stringify({client_id:+b.dataset.cid,key:b.dataset.key,body:text})});b.textContent='Opened \u2713';
+    });
+  });
+  document.querySelectorAll('.em-btn').forEach(function(b){
+    b.addEventListener('click',function(){
+      var ctx=JSON.parse(b.dataset.ctx);
+      var subject=fill(document.getElementById('subject').value,ctx);
+      var text=fill(document.getElementById('body').value,ctx);
+      if(b.dataset.mode==='gmail'){
+        window.open('https://mail.google.com/mail/?view=cm&fs=1'+(b.dataset.from?'&authuser='+encodeURIComponent(b.dataset.from):'')+'&to='+encodeURIComponent(b.dataset.email)+'&su='+encodeURIComponent(subject)+'&body='+encodeURIComponent(text),'_blank');
+      } else {
+        window.location.href='mailto:'+b.dataset.email+'?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(text.replace(/\n/g,'\r\n'));
+      }
+      fetch('{{ url_for("log_open") }}',{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':document.querySelector('meta[name=csrf-token]').content},body:JSON.stringify({client_id:+b.dataset.cid,key:b.dataset.key,channel:'email',body:subject+'\n\n'+text})});
+      b.textContent='Opened \u2713';
+    });
+  });
+})();
+</script>{% endblock %}

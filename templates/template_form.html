@@ -1,0 +1,20 @@
+{% extends "base.html" %}{% block title %}Message draft{% endblock %}
+{% block content %}
+<div class="topbar"><h1>{{ 'Edit' if t.id else 'New' }} message draft</h1></div>
+<form method="post" class="panel" style="max-width:760px">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="grid">
+    <div><label for="title">Draft name *</label><input id="title" type="text" name="title" value="{{ t.title or '' }}" required></div>
+    <div><label for="cat">Used for</label><select id="cat" name="category">
+      {% for k in ('birthday','anniversary','renewal','query','general') %}<option value="{{ k }}" {{ 'selected' if t.category==k }}>{{ k|title }}</option>{% endfor %}
+    </select></div>
+    <div class="full"><label for="subject">Email subject</label><input id="subject" type="text" name="subject" value="{{ t.subject or '' }}"></div>
+    <div class="full"><label for="body">Message *</label><textarea id="body" name="body" rows="9" required>{{ t.body or '' }}</textarea></div>
+  </div>
+  <p class="muted">Placeholders filled in automatically for each client:
+    <span class="tag">{name}</span> <span class="tag">{company}</span> <span class="tag">{employee_name}</span> <span class="tag">{employee_mobile}</span>
+    — birthday/anniversary: <span class="tag">{wish_for}</span> <span class="tag">{person}</span> <span class="tag">{couple}</span> <span class="tag">{spouse}</span>
+    — renewals: <span class="tag">{policy_type}</span> <span class="tag">{policy_number}</span> <span class="tag">{insurer}</span> <span class="tag">{expiry_date}</span> <span class="tag">{premium}</span></p>
+  <p class="actions"><button class="btn" type="submit">Save draft</button><a class="btn alt" href="{{ url_for('templates_list') }}">Cancel</a></p>
+</form>
+{% endblock %}

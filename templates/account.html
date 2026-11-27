@@ -1,0 +1,25 @@
+{% extends "base.html" %}{% block title %}Account{% endblock %}
+{% block content %}
+<div class="topbar"><h1>My account</h1></div>
+<form method="post" class="panel" style="max-width:560px">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="grid">
+    <div class="full"><label>Full name</label><input type="text" name="full_name" value="{{ current_user.full_name }}"></div>
+    {% if current_user.is_owner %}
+    <div class="full"><label>Username (login ID)</label><input type="text" name="username" value="{{ current_user.username }}" required></div>
+    {% endif %}
+    {% if current_user.is_owner %}
+    <div><label>Company mobile / WhatsApp number <span class="muted">(used for clients not given to an employee)</span></label><input type="tel" name="mobile" value="{{ current_user.mobile or '' }}"></div>
+    <div><label>Company email ID <span class="muted">(owner mails are sent from it)</span></label><input type="email" name="email" value="{{ current_user.email or '' }}"></div>
+    <div class="full"><label>Company mailbox password <span class="muted">(optional; saved encrypted{% if current_user.smtp_password %}, one is saved{% endif %})</span></label><input type="password" name="smtp_password" autocomplete="new-password">{% if current_user.smtp_password %}<label style="font-weight:400;margin-top:.3rem"><input type="checkbox" name="clear_smtp_password" style="width:auto"> Remove the saved password</label>{% endif %}</div>
+    <div class="full"><label>WhatsApp Business API phone-number ID <span class="muted">(optional)</span></label><input type="text" name="wa_phone_id" value="{{ current_user.wa_phone_id or '' }}"></div>
+    {% elif current_user.mobile %}
+    <div class="full"><span class="muted">Your number for client messages (set by the owner)</span><br><b>{{ current_user.mobile }}</b></div>
+    {% endif %}
+    <div class="full"><label>New password <span class="muted">(leave empty to keep the current one)</span></label><input type="password" name="new_password" autocomplete="new-password"></div>
+    <div class="full"><label>Confirm new password</label><input type="password" name="confirm_password" autocomplete="new-password"></div>
+    <div class="full"><label>Current password (required to save)</label><input type="password" name="current_password" required autocomplete="current-password"></div>
+  </div>
+  <p><button class="btn" type="submit">Save changes</button></p>
+</form>
+{% endblock %}

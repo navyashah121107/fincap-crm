@@ -1,0 +1,13 @@
+{% extends "base.html" %}{% block title %}Message drafts{% endblock %}
+{% block content %}
+<div class="topbar"><h1>Message drafts</h1>{% if current_user.can('add') %}<a class="btn gold" href="{{ url_for('template_edit') }}">New draft</a>{% endif %}</div>
+<div class="panel scroll">
+<table class="t"><thead><tr><th>Title</th><th>Used for</th><th>Message</th><th></th></tr></thead><tbody>
+{% for t in items %}
+<tr><td><b>{{ t.title }}</b></td><td><span class="pill">{{ t.category|title }}</span></td>
+<td style="white-space:pre-wrap;max-width:520px">{{ t.body }}</td>
+<td class="actions">{% if current_user.can('edit') %}<a class="btn alt sm" href="{{ url_for('template_edit', tid=t.id) }}">Edit</a>{% endif %}
+{% if current_user.can('delete') %}<form method="post" action="{{ url_for('template_delete', tid=t.id) }}" onsubmit="return confirm('Delete this draft?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn danger sm">Delete</button></form>{% endif %}</td></tr>
+{% else %}<tr><td colspan="4" class="muted">No drafts yet.</td></tr>{% endfor %}
+</tbody></table></div>
+{% endblock %}

@@ -1,0 +1,61 @@
+{% extends "base.html" %}{% block title %}Birthdays & anniversaries{% endblock %}
+{% block content %}
+{% set months = ['January','February','March','April','May','June','July','August','September','October','November','December'] %}
+<div class="topbar"><h1>Birthdays &amp; anniversaries</h1></div>
+<form class="toolbar" method="get">
+  <div><label for="month">Month</label><select id="month" name="month">{% for m in months %}<option value="{{ loop.index }}" {{ 'selected' if loop.index==month }}>{{ m }}</option>{% endfor %}</select></div>
+  <div><label for="type">Show</label><select id="type" name="type">
+    <option value="both" {{ 'selected' if kind=='both' }}>Birthdays and anniversaries</option>
+    <option value="birthday" {{ 'selected' if kind=='birthday' }}>Birthdays only</option>
+    <option value="anniversary" {{ 'selected' if kind=='anniversary' }}>Anniversaries only</option></select></div>
+  <div><label for="tid">Draft</label><select id="tid" name="template_id">{% for t in templates %}<option value="{{ t.id }}" {{ 'selected' if tpl and t.id==tpl.id }}>{{ t.title }}</option>{% endfor %}</select></div>
+  <button class="btn" type="submit">Show list</button>
+</form>
+
+<form method="post" action="{{ url_for('occasions', month=month, type=kind, template_id=tpl.id if tpl else '') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="panel"><h2>Draft message</h2><p class="muted" style="margin:.2rem 0 0">Birthday and anniversary wishes go by <b>WhatsApp only</b>, directly to the client, from the company number of the employee who handles that client (column <b>Sends from</b>). {% if wa_api_ok %}The client receives your approved WhatsApp template; this draft is used only if no template is set.{% else %}Press <b>Open WhatsApp</b> on a row: WhatsApp opens with the message ready and you press Send.{% endif %}</p>
+    <div class="grid">
+      <div class="full"><label for="body">Message — edit it here before sending; placeholders are filled for each person</label>
+      <textarea id="body" name="body" rows="6" {{ '' if current_user.can('send') else 'readonly' }}>{{ tpl.body if tpl else '' }}</textarea></div>
+    </div>
+  </div>
+  <div class="panel scroll"><h2>{{ months[month-1] }} <span class="muted" style="font-size:.9rem">({{ rows|length }})</span></h2>
+  {% if rows %}
+  <table class="t"><thead><tr>{% if current_user.can('send') %}<th><input type="checkbox" id="all" aria-label="Select all" style="width:auto"></th>{% endif %}
+    <th>Date</th><th>Who</th><th>Occasion</th><th>Client</th><th>Mobile</th><th>Email</th><th>Sends from</th>{% if current_user.can('send') %}<th>WhatsApp</th>{% endif %}</tr></thead><tbody>
+  {% for r in rows %}
+  <tr>{% if current_user.can('send') %}<td><input type="checkbox" name="sel" value="{{ r.key }}" class="pick" style="width:auto" aria-label="Select {{ r.person }}"></td>{% endif %}
+    <td>{{ r.date.strftime('%d %b') }}</td><td>{{ r.person }}<br><span class="muted">{{ r.relation }}</span></td>
+    <td>{{ 'Birthday' if r.kind=='birthday' else 'Anniversary' }}</td>
+    <td><a href="{{ url_for('client_detail', cid=r.client.id) }}">{{ r.client.name }}</a></td>
+    <td>{{ r.client.mobile or '' }}</td><td>{{ r.client.email or '' }}</td><td>{{ r.sender.full_name or r.sender.username }}<br><span class="muted">{{ r.sender.mobile or "no number set" }}{% if r.sender.email %}<br>{{ r.sender.email }}{% endif %}</span></td>
+    {% if current_user.can('send') %}<td>{% if wa_api_ok %}<span class="muted">Sent automatically{% if not r.wa %} (no mobile){% endif %}</span>{% elif r.wa and r.sender.id == current_user.id %}{% if r.done %}<span class="pill ok">Opened today &#10003;</span> {% endif %}<button type="button" class="btn wa sm wa-btn" data-key="{{ r.key }}" data-cid="{{ r.client.id }}" data-num="{{ r.wa }}" data-ctx='{{ r.ctx|tojson }}'>Open WhatsApp</button>{% elif r.wa %}<span class="muted">Only {{ r.sender.full_name or r.sender.username }} can send from their number</span>{% else %}<span class="muted">No mobile</span>{% endif %}</td>{% endif %}</tr>
+  {% endfor %}</tbody></table>
+  {% else %}<p class="muted">No dates fall in this month. Birthdays and anniversaries come from the client records.</p>{% endif %}
+  </div>
+  {% if current_user.can('send') and rows %}
+  <div class="panel"><h2>Send to the selected people</h2>
+    <p class="muted" style="margin-top:0">Sent by <b>WhatsApp only</b>, directly to each client from the company number of the employee who handles them.</p>
+    {% if wa_api_ok %}
+    <input type="hidden" name="channels" value="whatsapp_api">
+    <button class="btn" type="submit" onclick="return confirm('Send the WhatsApp message to all selected people?')">Send now</button>
+    {% else %}<div class="flash info">Each employee sends from their own WhatsApp: press <b>Open WhatsApp</b> on a row, then press Send in WhatsApp. (Sending without any click needs the WhatsApp Business API.)</div>{% endif %}
+  </div>
+  {% endif %}
+</form>
+{% endblock %}
+{% block scripts %}<script>
+(function(){
+  var all=document.getElementById('all');
+  if(all){all.addEventListener('change',function(){document.querySelectorAll('.pick').forEach(function(c){c.checked=all.checked;});});}
+  function fill(t,ctx){return t.replace(/\{(\w+)\}/g,function(m,k){return ctx[k]!==undefined?ctx[k]:m;});}
+  document.querySelectorAll('.wa-btn').forEach(function(b){
+    b.addEventListener('click',function(){
+      var text=fill(document.getElementById('body').value, JSON.parse(b.dataset.ctx));
+      window.open('https://wa.me/'+b.dataset.num+'?text='+encodeURIComponent(text),'_blank');
+      fetch('{{ url_for("log_open") }}',{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':document.querySelector('meta[name=csrf-token]').content},body:JSON.stringify({client_id:+b.dataset.cid,key:b.dataset.key,body:text})});b.textContent='Opened \u2713';
+    });
+  });
+})();
+</script>{% endblock %}

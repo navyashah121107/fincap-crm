@@ -1,0 +1,62 @@
+{% extends "base.html" %}{% block title %}Dashboard{% endblock %}
+{% block content %}
+<div class="topbar"><div><h1>Dashboard</h1><span class="muted">{{ today.strftime('%A, %d %B %Y') }}</span></div>
+{% if current_user.can('add') and current_user.can('clients') %}<a class="btn gold" href="{{ url_for('client_new') }}">Add client</a>{% endif %}</div>
+
+<div class="stats">
+  {% if current_user.can('clients') %}<div class="stat"><b>{{ stats.clients }}</b><span>Clients</span></div>{% endif %}
+  {% if current_user.can('policies') %}
+  <div class="stat"><b>{{ stats.sip }}</b><span>SIPs</span></div>
+  <div class="stat"><b>{{ stats.insurance }}</b><span>General &amp; health policies</span></div>
+  <div class="stat"><b>{{ stats.life }}</b><span>Life insurance</span></div>
+  <div class="stat"><b>{{ stats.fire }}</b><span>Fire insurance</span></div>
+  {% endif %}
+  {% if current_user.is_owner %}<div class="stat"><b>{{ stats.employees }}</b><span>Employees</span></div>{% endif %}
+</div>
+
+{% if current_user.can('policies') %}
+<div class="panel"><h2>Policies by type</h2>
+  <div class="stats" style="margin:0">
+  {% for k, label in INS_CATEGORIES.items() %}
+    <div class="stat"><b>{{ stats.by_cat[k] }}</b><span>{{ label }}</span></div>
+  {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<div class="two">
+  {% if current_user.can('clients') %}
+  <div class="panel"><h2>Birthdays &amp; anniversaries in the next 7 days</h2>
+    {% if upcoming %}
+    <table class="t"><thead><tr><th>Date</th><th>Who</th><th>Occasion</th><th>Client</th></tr></thead><tbody>
+    {% for r in upcoming %}
+      <tr><td>{{ r.next.strftime('%d %b') }}{% if r.next == today %} <span class="pill ok">Today</span>{% endif %}</td>
+      <td>{{ r.person }}</td><td>{{ 'Birthday' if r.kind=='birthday' else 'Anniversary' }}</td>
+      <td><a href="{{ url_for('client_detail', cid=r.client.id) }}">{{ r.client.name }}</a></td></tr>
+    {% endfor %}</tbody></table>
+    {% else %}<p class="muted">Nothing in the next 7 days.</p>{% endif %}
+  </div>
+  {% endif %}
+  {% if current_user.can('policies') %}
+  <div class="panel"><h2>Renewals in the next 30 days</h2>
+    {% if renewals %}
+    <table class="t"><tbody>
+    {% for r in renewals %}
+      <tr><td>{{ r.expiry|fdate }}<br><span class="muted">{{ r.days }} days</span></td>
+      <td>{{ pol_title(r.kind, r.p) }}<br><a href="{{ url_for('client_detail', cid=r.client.id) }}">{{ r.client.name }}</a></td></tr>
+    {% endfor %}</tbody></table>
+    <p><a href="{{ url_for('renewals') }}">See all renewals</a></p>
+    {% else %}<p class="muted">No renewals due in the next 30 days.</p>{% endif %}
+  </div>
+  {% endif %}
+</div>
+
+{% if current_user.can('messages') %}
+<div class="panel"><h2>Recent messages</h2>
+  {% if logs %}<table class="t"><tbody>
+  {% for l in logs %}<tr><td>{{ l.sent_at.strftime('%d %b %H:%M') }}</td><td>{{ l.client_name }}</td><td>{{ l.channel }}</td>
+    <td><span class="pill {{ 'ok' if l.status in ('sent','opened') else 'bad' }}">{{ l.status }}</span></td></tr>{% endfor %}
+  </tbody></table>{% else %}<p class="muted">No messages sent yet.</p>{% endif %}
+</div>
+{% endif %}
+{% endblock %}

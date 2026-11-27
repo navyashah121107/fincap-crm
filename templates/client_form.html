@@ -1,0 +1,59 @@
+{% extends "base.html" %}{% block title %}{{ 'Edit client' if c else 'Add client' }}{% endblock %}
+{% block content %}
+{% macro rows(prefix, items) %}
+  {% for s in items %}
+  <div class="row">
+    <div class="lab">{{ s.label }}<input type="hidden" name="{{ prefix }}rel" value="{{ s.rel }}"></div>
+    <input type="text" name="{{ prefix }}name" value="{{ s.name }}" placeholder="Name" aria-label="{{ s.label }} name">
+    <input type="date" name="{{ prefix }}bday" value="{{ s.bday }}" aria-label="{{ s.label }} birthday">
+  </div>
+  {% endfor %}
+{% endmacro %}
+<div class="topbar"><h1>{{ 'Edit ' ~ c.name if c else 'Add client' }}</h1></div>
+<form method="post">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="panel"><h2>Client details</h2>
+    <div class="grid">
+      <div><label for="name">Full name *</label><input id="name" type="text" name="name" value="{{ data.get('name','') }}" required></div>
+      <div><label for="mobile">Mobile number</label><input id="mobile" type="tel" name="mobile" value="{{ data.get('mobile','') }}"></div>
+      <div><label for="email">Email</label><input id="email" type="email" name="email" value="{{ data.get('email','') }}"></div>
+      <div><label for="birthday">Client's birthday</label><input id="birthday" type="date" name="birthday" value="{{ data.get('birthday','') }}"></div>
+      <div class="full"><label for="address">Address</label><textarea id="address" name="address" rows="2">{{ data.get('address','') }}</textarea></div>
+      {% if current_user.is_owner %}
+      <div><label for="assigned_to">Handled by (employee)</label>
+        <select id="assigned_to" name="assigned_to"><option value="">Owner (no employee)</option>
+          {% for u in staff %}<option value="{{ u.id }}" {{ 'selected' if (data.get('assigned_to','') ~ '') == (u.id ~ '') }}>{{ u.full_name or u.username }} · {{ u.mobile or 'no number' }}</option>{% endfor %}
+        </select></div>
+      {% endif %}
+      <div><label for="ms">Marital status</label>
+        <select id="ms" name="marital_status">
+          <option value="married" {{ 'selected' if data.get('marital_status','married')=='married' }}>Married</option>
+          <option value="single" {{ 'selected' if data.get('marital_status')=='single' }}>Single</option>
+        </select></div>
+    </div>
+  </div>
+  <div class="panel" id="grpM"><h2>Spouse and children</h2>
+    <div class="grid" style="margin-bottom:1rem"><div><label for="ann">Wedding anniversary</label><input id="ann" type="date" name="anniversary" value="{{ data.get('anniversary','') }}"></div></div>
+    <p class="muted" style="margin-top:0">Add up to 4 children. Leave a row empty if it doesn't apply.</p>
+    {{ rows('m_', slots.married) }}
+  </div>
+  <div class="panel" id="grpS"><h2>Parents and siblings</h2>
+    <p class="muted" style="margin-top:0">Leave a row empty if it doesn't apply.</p>
+    {{ rows('s_', slots.single) }}
+  </div>
+  <div class="actions"><button class="btn" type="submit">Save client</button>
+  <a class="btn alt" href="{{ url_for('client_detail', cid=c.id) if c else url_for('clients') }}">Cancel</a></div>
+</form>
+{% endblock %}
+{% block scripts %}<script>
+(function(){
+  var ms=document.getElementById('ms'), m=document.getElementById('grpM'), s=document.getElementById('grpS');
+  function sync(){
+    var married = ms.value==='married';
+    m.hidden=!married; s.hidden=married;
+    m.querySelectorAll('input').forEach(function(i){i.disabled=!married;});
+    s.querySelectorAll('input').forEach(function(i){i.disabled=married;});
+  }
+  ms.addEventListener('change',sync); sync();
+})();
+</script>{% endblock %}

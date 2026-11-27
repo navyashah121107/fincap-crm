@@ -1,0 +1,59 @@
+{% extends "base.html" %}{% block title %}Write to a client{% endblock %}
+{% block content %}
+<div class="topbar"><h1>Write to a client</h1></div>
+{% if not client %}
+<form class="panel toolbar" method="get" style="max-width:640px"><div style="flex:1"><label for="cl">Choose a client</label>
+<select id="cl" name="client_id" required><option value="">Select…</option>{% for c in all_clients %}<option value="{{ c.id }}">{{ c.name }}{% if c.mobile %} · {{ c.mobile }}{% endif %}</option>{% endfor %}</select></div>
+<button class="btn" type="submit">Continue</button></form>
+{% else %}
+<div class="panel" style="max-width:760px">
+  <p style="margin-top:0"><b>{{ client.name }}</b> · {{ client.mobile or 'no mobile' }} · {{ client.email or 'no email' }}{% if sender %}<br><span class="muted">Goes out as <b>{{ sender.full_name or sender.username }}</b> · {{ sender.mobile or 'no number set' }}{% if sender.email %} · {{ sender.email }}{% endif %}</span>{% endif %}
+  {% if policy %}<br><span class="muted">{{ pol_title(pkind, policy) }} · policy {{ policy.policy_number }} · ends {{ pol_expiry(pkind, policy)|fdate }}</span>{% endif %}</p>
+  <form method="get" class="toolbar">
+    <input type="hidden" name="client_id" value="{{ client.id }}">
+    {% if policy %}<input type="hidden" name="pkind" value="{{ pkind }}"><input type="hidden" name="pid" value="{{ policy.id }}">{% endif %}
+    <div><label for="tid">Start from draft</label><select id="tid" name="template_id" onchange="this.form.submit()">
+      {% for t in templates %}<option value="{{ t.id }}" {{ 'selected' if tpl and t.id==tpl.id }}>{{ t.title }}</option>{% endfor %}</select></div>
+  </form>
+  <form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="client_id" value="{{ client.id }}">
+    {% if policy %}<input type="hidden" name="pkind" value="{{ pkind }}"><input type="hidden" name="pid" value="{{ policy.id }}">{% endif %}
+    <p><label for="subject">Email subject</label><input id="subject" type="text" name="subject" value="{{ subject }}"></p>
+    <p><label for="body">Message (edit freely)</label><textarea id="body" name="body" rows="9" required>{{ body }}</textarea></p>
+    {% if current_user.can('send') %}
+    <div class="perm"><input type="checkbox" name="channels" value="email" id="ch1" {{ 'checked' if email_ok and client.email else 'disabled' }}><label for="ch1" style="font-weight:400">Send email {% if not email_ok %}<span class="muted">(SMTP not set up)</span>{% elif not client.email %}<span class="muted">(client has no email)</span>{% endif %}</label></div>
+    <div class="perm"><input type="checkbox" name="channels" value="whatsapp_api" id="ch2" {{ 'checked' if wa_api_ok else 'disabled' }}><label for="ch2" style="font-weight:400">Send via WhatsApp Business API {% if not wa_api_ok %}<span class="muted">(not set up)</span>{% endif %}</label></div>
+    <p class="actions"><button class="btn" type="submit">Send message</button>
+    {% if client.mobile and sender and sender.id == current_user.id and not wa_api_ok %}<button type="button" class="btn wa" id="wa" data-num="{{ client.mobile }}">Open in WhatsApp</button>{% endif %}
+    {% if client.email and sender and sender.id == current_user.id %}<button type="button" class="btn" id="gm" data-email="{{ client.email }}" data-from="{{ sender.email or '' }}" data-cid="{{ client.id }}">Open email draft (Gmail)</button><button type="button" class="btn alt" id="ma" data-email="{{ client.email }}" data-cid="{{ client.id }}">Mail app</button>{% endif %}
+    <a class="btn alt" href="{{ url_for('client_detail', cid=client.id) }}">Back to client</a></p>
+    {% endif %}
+  </form>
+</div>
+{% endif %}
+{% endblock %}
+{% block scripts %}<script>
+(function(){
+  var b=document.getElementById('wa'); if(!b) return;
+  b.addEventListener('click',function(){
+    var num=b.dataset.num.replace(/\D/g,'').replace(/^0+/,''); if(num.length===10) num='91'+num;
+    var text=document.getElementById('body').value;
+    window.open('https://wa.me/'+num+'?text='+encodeURIComponent(text),'_blank');
+    fetch('{{ url_for("log_open") }}',{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':document.querySelector('meta[name=csrf-token]').content},body:JSON.stringify({client_id:{{ client.id if client else 0 }},body:text})});
+  });
+})();
+</script>
+<script>
+(function(){
+  var gm=document.getElementById('gm'), ma=document.getElementById('ma');
+  function data(){return {subject:document.getElementById('subject').value, text:document.getElementById('body').value};}
+  function log(cid,d){fetch('{{ url_for("log_open") }}',{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':document.querySelector('meta[name=csrf-token]').content},body:JSON.stringify({client_id:+cid,channel:'email',body:d.subject+'\n\n'+d.text})});}
+  if(gm){gm.addEventListener('click',function(){var d=data();
+    window.open('https://mail.google.com/mail/?view=cm&fs=1'+(gm.dataset.from?'&authuser='+encodeURIComponent(gm.dataset.from):'')+'&to='+encodeURIComponent(gm.dataset.email)+'&su='+encodeURIComponent(d.subject)+'&body='+encodeURIComponent(d.text),'_blank');
+    log(gm.dataset.cid,d);});}
+  if(ma){ma.addEventListener('click',function(){var d=data();
+    window.location.href='mailto:'+ma.dataset.email+'?subject='+encodeURIComponent(d.subject)+'&body='+encodeURIComponent(d.text.replace(/\n/g,'\r\n'));
+    log(ma.dataset.cid,d);});}
+})();
+</script>{% endblock %}

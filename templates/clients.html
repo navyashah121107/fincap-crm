@@ -1,0 +1,46 @@
+{% extends "base.html" %}{% block title %}Clients{% endblock %}
+{% block content %}
+<div class="topbar"><h1>{{ 'My clients' if not current_user.is_owner else 'Clients' }} <span class="muted" style="font-size:1rem">({{ clients|length }})</span></h1>
+{% if current_user.can('add') %}<a class="btn gold" href="{{ url_for('client_new') }}">Add client</a>{% endif %}</div>
+<form class="toolbar" method="get">
+  <div style="flex:1;max-width:380px"><label for="q">Search by name, mobile or email</label><input id="q" type="text" name="q" value="{{ q }}"></div>
+  {% if current_user.is_owner %}
+  <div><label for="h">Handled by</label><select id="h" name="handler">
+    <option value="">Everyone</option><option value="none" {{ 'selected' if handler=='none' }}>Owner (not assigned)</option>
+    {% for u in staff %}<option value="{{ u.id }}" {{ 'selected' if handler==(u.id ~ '') }}>{{ u.full_name or u.username }}</option>{% endfor %}
+  </select></div>
+  {% endif %}
+  <button class="btn" type="submit">Search</button>
+  {% if q or handler %}<a class="btn alt" href="{{ url_for('clients') }}">Clear</a>{% endif %}
+</form>
+<form method="post" action="{{ url_for('clients_assign') }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+{% if current_user.is_owner and clients %}
+<div class="toolbar panel" style="padding:.7rem 1rem">
+  <div><label for="emp">Hand the ticked clients to</label><select id="emp" name="employee_id">
+    <option value="none">Owner (no employee)</option>{% for u in staff %}<option value="{{ u.id }}">{{ u.full_name or u.username }} · {{ u.mobile or 'no number' }}</option>{% endfor %}</select></div>
+  <button class="btn alt" type="submit">Assign</button>
+  <span class="muted">Messages for these clients will use that person's number.</span>
+</div>
+{% endif %}
+<div class="panel scroll">
+{% if clients %}
+<table class="t"><thead><tr>{% if current_user.is_owner %}<th><input type="checkbox" id="all" aria-label="Select all" style="width:auto"></th>{% endif %}
+<th>Name</th><th>Mobile</th><th>Email</th><th>Birthday</th><th>Anniversary</th><th>Policies</th>{% if current_user.is_owner %}<th>Handled by</th>{% endif %}<th></th></tr></thead><tbody>
+{% for c in clients %}
+<tr>{% if current_user.is_owner %}<td><input type="checkbox" name="ids" value="{{ c.id }}" class="pick" style="width:auto" aria-label="Select {{ c.name }}"></td>{% endif %}
+<td><a href="{{ url_for('client_detail', cid=c.id) }}"><b>{{ c.name }}</b></a></td><td>{{ c.mobile or '' }}</td><td>{{ c.email or '' }}</td>
+<td>{{ c.birthday|fdate }}</td><td>{{ c.anniversary|fdate }}</td>
+<td>{{ c.sips|length + c.insurances|length + c.lifes|length + c.fires|length }}</td>
+{% if current_user.is_owner %}<td>{{ handler_name(c) }}</td>{% endif %}
+<td class="actions"><a class="btn alt sm" href="{{ url_for('client_detail', cid=c.id) }}">Open</a>
+{% if current_user.can('edit') %}<a class="btn alt sm" href="{{ url_for('client_edit', cid=c.id) }}">Edit</a>{% endif %}</td></tr>
+{% endfor %}</tbody></table>
+{% else %}<p class="muted">No clients found.{% if current_user.can('add') %} <a href="{{ url_for('client_new') }}">Add your first client.</a>{% endif %}</p>{% endif %}
+</div>
+</form>
+{% endblock %}
+{% block scripts %}<script>
+var all=document.getElementById('all');
+if(all){all.addEventListener('change',function(){document.querySelectorAll('.pick').forEach(function(c){c.checked=all.checked;});});}
+</script>{% endblock %}

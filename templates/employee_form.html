@@ -1,0 +1,27 @@
+{% extends "base.html" %}{% block title %}Employee{% endblock %}
+{% block content %}
+<div class="topbar"><h1>{{ 'Edit access' if u.id else 'Register employee' }}</h1></div>
+<form method="post" class="panel" style="max-width:640px">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="grid">
+    <div><label for="fn">Full name</label><input id="fn" type="text" name="full_name" value="{{ u.full_name or '' }}"></div>
+    <div><label for="un">Employee ID (login) *</label><input id="un" type="text" name="username" value="{{ u.username or '' }}" required autocomplete="off"></div>
+    <div><label for="mob">Company mobile / WhatsApp number * <span class="muted">(shown on messages to their clients)</span></label><input id="mob" type="tel" name="mobile" value="{{ u.mobile or '' }}" placeholder="98XXXXXXXX" required></div>
+    <div><label for="em">Company email ID{{ '' if shared_mail else ' *' }} <span class="muted">({{ 'optional: all mail is sent through the shared mail account' if shared_mail else 'emails to their clients are sent from it' }})</span></label><input id="em" type="email" name="email" value="{{ u.email or '' }}" placeholder="name@shashwatfincap.com" {{ '' if shared_mail else 'required' }}></div>
+    <div class="full"><label for="smp">Company mailbox password <span class="muted">(so emails go out from this employee's own mailbox{% if u.smtp_password %}; one is saved, leave empty to keep it{% endif %})</span></label><input id="smp" type="password" name="smtp_password" autocomplete="new-password" placeholder="{{ 'saved (hidden)' if u.smtp_password else 'optional' }}">{% if u.smtp_password %}<label style="font-weight:400;margin-top:.3rem"><input type="checkbox" name="clear_smtp_password" style="width:auto"> Remove the saved password</label>{% endif %}</div>
+    <div class="full"><label for="wid">WhatsApp Business API phone-number ID of this company number <span class="muted">(needed only for automatic WhatsApp)</span></label><input id="wid" type="text" name="wa_phone_id" value="{{ u.wa_phone_id or '' }}"></div>
+    <div class="full"><label for="pw">{{ 'New password (leave empty to keep)' if u.id else 'Password * (8+ characters)' }}</label><input id="pw" type="password" name="password" autocomplete="new-password" {{ '' if u.id else 'required' }}></div>
+  </div>
+  <h2 style="margin-top:1.2rem">What can this employee view?</h2>
+  {% for key, label in PERM_VIEW.items() %}
+    <div class="perm"><input type="checkbox" id="p_{{ key }}" name="perm_{{ key }}" {{ 'checked' if key in (u.perms or '').split(',') }}><label for="p_{{ key }}" style="font-weight:400">{{ label }}</label></div>
+  {% endfor %}
+  <h2 style="margin-top:1.2rem">What can this employee do?</h2>
+  <p class="muted" style="margin-top:0">Leave all unticked for view-only. Add, edit and delete only work on sections the employee is also allowed to view (e.g. editing policies needs "View SIP / insurance…"). Sending messages needs "View message drafts…".</p>
+  {% for key, label in PERM_ACT.items() %}
+    <div class="perm"><input type="checkbox" id="p_{{ key }}" name="perm_{{ key }}" {{ 'checked' if key in (u.perms or '').split(',') }}><label for="p_{{ key }}" style="font-weight:400">{{ label }}</label></div>
+  {% endfor %}
+  <div class="perm"><input type="checkbox" id="act" name="is_active" {{ 'checked' if u.is_active_user }}><label for="act" style="font-weight:400">Account is active (untick to block sign-in)</label></div>
+  <p class="actions"><button class="btn" type="submit">Save employee</button><a class="btn alt" href="{{ url_for('employees') }}">Cancel</a></p>
+</form>
+{% endblock %}

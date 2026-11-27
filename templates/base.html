@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="csrf-token" content="{{ csrf_token() }}">
+<title>{% block title %}CRM{% endblock %} · {{ COMPANY }}</title>
+<link rel="icon" href="{{ logo }}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:wght@500;600&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <a class="brand" href="{{ url_for('dashboard') }}" aria-label="{{ COMPANY }} home">
+      <img class="logo" src="{{ logo }}" alt="{{ COMPANY }}" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+      <span class="brand-text" style="display:none">{{ COMPANY }}</span>
+    </a>
+    {% set ep = request.endpoint or '' %}
+    <a class="nav {{ 'active' if ep=='dashboard' }}" href="{{ url_for('dashboard') }}">Dashboard</a>
+    {% if current_user.can('clients') %}
+      <a class="nav {{ 'active' if ep in ('clients','client_detail','client_edit') }}" href="{{ url_for('clients') }}">Clients</a>
+    {% endif %}
+    {% if current_user.can('add') and current_user.can('clients') %}
+      <a class="nav {{ 'active' if ep=='client_new' }}" href="{{ url_for('client_new') }}">Add client</a>
+    {% endif %}
+    {% if current_user.can('policies') %}
+      <a class="nav {{ 'active' if ep=='renewals' }}" href="{{ url_for('renewals') }}">Renewals due</a>
+    {% endif %}
+    {% if current_user.can('messages') %}
+      <div class="sep">Messages</div>
+      <a class="nav {{ 'active' if ep=='occasions' }}" href="{{ url_for('occasions') }}">Birthdays &amp; anniversaries</a>
+      <a class="nav {{ 'active' if ep=='compose' }}" href="{{ url_for('compose') }}">Write to a client</a>
+      <a class="nav {{ 'active' if ep in ('templates_list','template_edit') }}" href="{{ url_for('templates_list') }}">Message drafts</a>
+      <a class="nav {{ 'active' if ep=='logs' }}" href="{{ url_for('logs') }}">Send history</a>
+    {% endif %}
+    {% if current_user.can('export') %}
+      <div class="sep">Export to Excel</div>
+      {% if current_user.can('clients') %}<a class="nav" href="{{ url_for('export', what='clients') }}">Clients</a>{% endif %}
+      {% if current_user.can('policies') %}
+        <a class="nav" href="{{ url_for('export', what='sip') }}">SIP</a>
+        <a class="nav" href="{{ url_for('export', what='insurance') }}">Insurance</a>
+        <a class="nav" href="{{ url_for('export', what='life') }}">Life insurance</a>
+        <a class="nav" href="{{ url_for('export', what='fire') }}">Fire insurance</a>
+      {% endif %}
+    {% endif %}
+    {% if current_user.is_owner %}
+      <div class="sep">Admin</div>
+      <a class="nav {{ 'active' if ep in ('employees','employee_edit') }}" href="{{ url_for('employees') }}">Employees</a>
+    {% endif %}
+    <div class="me">
+      <div>{{ current_user.full_name or current_user.username }}<br><small>{{ 'Owner' if current_user.is_owner else 'Employee' }}{% if current_user.mobile %} · {{ current_user.mobile }}{% endif %}</small></div>
+      <div><a href="{{ url_for('account') }}">Account</a>
+      <form method="post" action="{{ url_for('logout') }}" style="display:inline">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn alt sm" type="submit">Sign out</button>
+      </form></div>
+    </div>
+  </aside>
+  <main class="main">
+    {% with msgs = get_flashed_messages(with_categories=true) %}
+      {% for cat, m in msgs %}<div class="flash {{ cat if cat in ('success','danger') else 'info' }}">{{ m }}</div>{% endfor %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+</div>
+<script>document.addEventListener('click',function(e){document.querySelectorAll('details.dd[open]').forEach(function(d){if(!d.contains(e.target))d.removeAttribute('open');});});</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>
